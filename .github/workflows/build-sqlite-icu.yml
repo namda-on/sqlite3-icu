@@ -24,16 +24,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Check build directory
-      run: ls -alh build/
-
     - name: Build Docker image and extension
       run: |
         docker buildx build \
-          --load \
-          -f build/Dockerfile.alpine \
-          -t sqlite-icu-alpine:${{ matrix.os }} \
-          build/
+          -f Dockerfile.alpine \
+          -t sqlite-icu-alpine:${{ matrix.os }} .
 
     - name: Extract built extension
       run: |
@@ -68,10 +63,8 @@ jobs:
     - name: Build Docker image and extension
       run: |
         docker buildx build \
-          --load \
-          -f build/Dockerfile.ubuntu \
-          -t sqlite-icu-ubuntu:${{ matrix.arch }} \
-          build/
+          -f Dockerfile.ubuntu \
+          -t sqlite-icu-ubuntu:${{ matrix.arch }} .
 
     - name: Extract built extension
       run: |
@@ -105,8 +98,8 @@ jobs:
 
     - name: Build extension
       run: |
-        chmod +x build/build-macos.sh
-        ARCH=${{ matrix.arch }} build/build-macos.sh
+        chmod +x build-macos.sh
+        ARCH=${{ matrix.arch }} build-macos.sh
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
