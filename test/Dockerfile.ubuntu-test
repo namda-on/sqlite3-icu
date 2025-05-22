@@ -1,0 +1,17 @@
+FROM ubuntu:24.04
+
+# Install runtime dependencies for testing
+RUN apt-get update -q && \
+    apt-get install -y \
+        sqlite3 \
+        libicu70 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /test
+
+# Copy test script
+COPY test-ubuntu.sh /test/
+RUN chmod +x /test/test-ubuntu.sh
+
+ENTRYPOINT ["/test/test-ubuntu.sh"]

@@ -1,0 +1,225 @@
+name: Build SQLite ICU Extension
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-alpine:
+    name: Build Alpine Linux (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+        fail-fast: true
+        matrix:
+            include:
+                - os: ubuntu-24.04
+                  arch: amd64
+                - os: ubuntu-24.04-arm
+                  arch: arm64
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check build directory
+      run: ls -alh build/
+
+    - name: Build Docker image and extension
+      run: |
+        docker buildx build \
+          --load \
+          -f build/Dockerfile.alpine \
+          -t sqlite-icu-alpine:${{ matrix.os }} \
+          build/
+
+    - name: Extract built extension
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}:/output \
+          -e ARCH=${{ matrix.arch }} \
+          sqlite-icu-alpine:${{ matrix.arch }} \
+          sh -c 'cp /build/libSqliteIcu-linux-alpine-*.so /output/'
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sqlite-icu-alpine-${{ matrix.arch }}
+        path: libSqliteIcu-linux-alpine-${{ matrix.arch }}.so
+
+  build-ubuntu:
+    name: Build Ubuntu Linux (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+        fail-fast: true
+        matrix:
+            include:
+                - os: ubuntu-24.04
+                  arch: amd64
+                - os: ubuntu-24.04-arm
+                  arch: arm64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image and extension
+      run: |
+        docker buildx build \
+          --load \
+          -f build/Dockerfile.ubuntu \
+          -t sqlite-icu-ubuntu:${{ matrix.arch }} \
+          build/
+
+    - name: Extract built extension
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}:/output \
+          -e ARCH=${{ matrix.arch }} \
+          sqlite-icu-ubuntu:${{ matrix.arch }} \
+          sh -c 'cp /build/libSqliteIcu-linux-ubuntu-*.so /output/'
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sqlite-icu-ubuntu-${{ matrix.arch }}
+        path: libSqliteIcu-linux-ubuntu-${{ matrix.arch }}.so
+
+  build-macos:
+    name: Build macOS (${{ matrix.arch }})
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        brew update
+        brew install icu4c pkg-config sqlite wget
+
+    - name: Build extension
+      run: |
+        chmod +x build/build-macos.sh
+        ARCH=${{ matrix.arch }} build/build-macos.sh
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sqlite-icu-macos-${{ matrix.arch }}
+        path: libSqliteIcu-macos-${{ matrix.arch }}.dylib
+
+  test-extensions:
+    name: Test Built Extensions
+    needs: [build-alpine, build-ubuntu]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Download Alpine artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: sqlite-icu-alpine-*
+        merge-multiple: true
+    
+    - name: Download Ubuntu artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: sqlite-icu-ubuntu-*
+        merge-multiple: true
+    
+    - name: Build Alpine test image
+      run: |
+        docker build \
+          -f test/Dockerfile.alpine-test \
+          -t sqlite-icu-test-alpine:latest \
+          test/
+    
+    - name: Build Ubuntu test image
+      run: |
+        docker build \
+          -f test/Dockerfile.ubuntu-test \
+          -t sqlite-icu-test-ubuntu:latest \
+          test/
+    
+    - name: Test Alpine extension
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}:/workspace \
+          sqlite-icu-test-alpine:latest
+    
+    - name: Test Ubuntu extension
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}:/workspace \
+          sqlite-icu-test-ubuntu:latest
+
+  create-release:
+    name: Create Release
+    needs: [build-alpine, build-ubuntu, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        merge-multiple: true
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          libSqliteIcu-*
+        body: |
+          # SQLite ICU Extension - Multi-platform builds
+          This release contains SQLite ICU extensions built for multiple platforms and architectures.
+
+          ## Available builds:
+
+          ### Linux Alpine (musl libc)
+          - `libSqliteIcu-linux-alpine-amd64.so` - x86_64 architecture
+          - `libSqliteIcu-linux-alpine-arm64.so` - ARM64 architecture
+
+          ### Linux Ubuntu (glibc)
+          - `libSqliteIcu-linux-ubuntu-amd64.so` - x86_64 architecture
+          - `libSqliteIcu-linux-ubuntu-arm64.so` - ARM64 architecture
+
+          ### macOS
+          - `libSqliteIcu-macos-x86_64.dylib` - Intel Macs
+          - `libSqliteIcu-macos-arm64.dylib` - Apple Silicon Macs
+
+          ## Usage
+
+          Load the appropriate extension in SQLite:
+
+          ```sql
+          -- Load the extension
+          .load ./libSqliteIcu-[platform-arch].[ext]
+
+          -- Example: Load Korean collation
+          SELECT icu_load_collation('ko_KR', 'STANDARD');
+
+          -- Use ICU functions
+          SELECT upper('한글', 'ko_KR');
+          ```
+
+          ## Requirements
+          - **Alpine Linux**: Requires `icu-libs` package
+          - **Ubuntu/Debian**: Requires `libicu` package
+          - **macOS**: ICU is included in the system
+
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

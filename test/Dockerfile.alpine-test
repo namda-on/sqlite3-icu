@@ -1,0 +1,12 @@
+FROM alpine:latest
+
+RUN apk add --no-cache \
+    sqlite \
+    icu-libs
+
+WORKDIR /test
+
+COPY test-alpine.sh /test/
+RUN chmod +x /test/test-alpine.sh
+
+ENTRYPOINT ["/test/test-alpine.sh"]

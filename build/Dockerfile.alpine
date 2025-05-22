@@ -1,0 +1,27 @@
+FROM alpine:latest
+
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    make \
+    pkgconfig \
+    sqlite-dev \
+    icu-dev \
+    wget \
+    unzip \
+    file
+
+WORKDIR /build
+
+RUN wget -q https://www.sqlite.org/2024/sqlite-amalgamation-3460000.zip && \
+    unzip -q sqlite-amalgamation-3460000.zip && \
+    cp sqlite-amalgamation-3460000/sqlite3ext.h . && \
+    cp sqlite-amalgamation-3460000/sqlite3.h . && \
+    rm -rf sqlite-amalgamation-3460000*
+
+RUN wget -q https://www.sqlite.org/src/raw/ext/icu/icu.c
+
+COPY build-alpine.sh /build/
+RUN chmod +x /build/build-alpine.sh
+
+ENTRYPOINT ["/build/build-alpine.sh"]
