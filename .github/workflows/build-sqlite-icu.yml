@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-alpine:
-    name: Build Alpine Linux (${{ matrix.os }})
+    name: Build Alpine Linux (${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
     strategy:
         fail-fast: true
@@ -28,21 +28,22 @@ jobs:
       run: |
         docker buildx build \
           -f Dockerfile.alpine \
-          -t sqlite-icu-alpine:${{ matrix.os }} .
+          -t sqlite-icu-alpine-${{ matrix.arch }} .
 
-    - name: Extract built extension
-      run: |
-        docker run --rm \
-          -v ${{ github.workspace }}:/output \
-          -e ARCH=${{ matrix.arch }} \
-          sqlite-icu-alpine:${{ matrix.arch }} \
-          sh -c 'cp /build/libSqliteIcu-linux-alpine-*.so /output/'
+        mkdir -p ${{ github.workspace }}/build
+        BUILDER_CID=$(docker create sqlite-icu-alpine-${{ matrix.arch }})
+        docker cp "${BUILDER_CID}:/output/." "${{ github.workspace }}/build/"
+        docker rm "${BUILDER_CID}"
+
+        ls -al
+
+        tar -czvf libSqliteIcu-alpine-${{ matrix.arch }}.tar.gz -C ${{ github.workspace }}/build libSqliteIcu.so
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: sqlite-icu-alpine-${{ matrix.arch }}
-        path: libSqliteIcu-linux-alpine-${{ matrix.arch }}.so
+        path: libSqliteIcu-alpine-${{ matrix.arch }}.tar.gz
 
   build-ubuntu:
     name: Build Ubuntu Linux (${{ matrix.arch }})
@@ -64,48 +65,47 @@ jobs:
       run: |
         docker buildx build \
           -f Dockerfile.ubuntu \
-          -t sqlite-icu-ubuntu:${{ matrix.arch }} .
+          -t sqlite-icu-ubuntu-${{ matrix.arch }} .
 
-    - name: Extract built extension
-      run: |
-        docker run --rm \
-          -v ${{ github.workspace }}:/output \
-          -e ARCH=${{ matrix.arch }} \
-          sqlite-icu-ubuntu:${{ matrix.arch }} \
-          sh -c 'cp /build/libSqliteIcu-linux-ubuntu-*.so /output/'
+        mkdir -p ${{ github.workspace }}/build
+        BUILDER_CID=$(docker create sqlite-icu-ubuntu-${{ matrix.arch }})
+        docker cp "${BUILDER_CID}:/output/." "${{ github.workspace }}/build/"
+        docker rm "${BUILDER_CID}"
+
+        tar -czvf libSqliteIcu-ubuntu24.04-${{ matrix.arch }}.tar.gz -C ${{ github.workspace }}/build libSqliteIcu.so
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: sqlite-icu-ubuntu-${{ matrix.arch }}
-        path: libSqliteIcu-linux-ubuntu-${{ matrix.arch }}.so
+        path: libSqliteIcu-ubuntu24.04-${{ matrix.arch }}.tar.gz
 
-  build-macos:
-    name: Build macOS (${{ matrix.arch }})
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        arch: [arm64]
+#   build-macos:
+#     name: Build macOS (${{ matrix.arch }})
+#     runs-on: macos-latest
+#     strategy:
+#       matrix:
+#         arch: [arm64]
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+#     steps:
+#     - name: Checkout code
+#       uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        brew update
-        brew install icu4c pkg-config sqlite wget
+#     - name: Install dependencies
+#       run: |
+#         brew update
+#         brew install icu4c pkg-config sqlite wget
 
-    - name: Build extension
-      run: |
-        chmod +x build-macos.sh
-        ARCH=${{ matrix.arch }} build-macos.sh
+#     - name: Build extension
+#       run: |
+#         chmod +x ./build-macos.sh
+#         ARCH=${{ matrix.arch }} ./build-macos.sh
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: sqlite-icu-macos-${{ matrix.arch }}
-        path: libSqliteIcu-macos-${{ matrix.arch }}.dylib
+#     - name: Upload artifacts
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: sqlite-icu-macos-${{ matrix.arch }}
+#         path: libSqliteIcu-macos-${{ matrix.arch }}.dylib
 
   test-extensions:
     name: Test Built Extensions
@@ -159,7 +159,7 @@ jobs:
 
   create-release:
     name: Create Release
-    needs: [build-alpine, build-ubuntu, build-macos]
+    needs: [build-alpine, build-ubuntu]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
 

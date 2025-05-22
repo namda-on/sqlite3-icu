@@ -10,17 +10,18 @@ echo "Building SQLite ICU extension for Alpine Linux - ${ARCH}"
 gcc -fPIC -shared icu.c \
     $(pkg-config --libs --cflags icu-io) \
     -I. \
-    -o libSqliteIcu-linux-alpine-${ARCH}.so
+    -o ./libSqliteIcu.so
 
 # Verify the build
 echo "Build completed successfully!"
-file libSqliteIcu-linux-alpine-${ARCH}.so
-ls -la libSqliteIcu-linux-alpine-${ARCH}.so
+file ./libSqliteIcu.so
+ls -la ./libSqliteIcu.so
+
 
 # Test the extension
 echo "Testing the extension..."
 sqlite3 <<EOF
-.load ./libSqliteIcu-linux-alpine-${ARCH}.so
+.load ./libSqliteIcu.so sqlite3_icu_init
 SELECT 'Extension loaded successfully' as result;
 .quit
 EOF

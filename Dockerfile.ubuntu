@@ -7,12 +7,13 @@ RUN apt-get update -q && \
         pkg-config \
         libsqlite3-dev \
         libicu-dev \
+        sqlite3 \
         wget \
         unzip \
         file && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /build
+WORKDIR /output
 
 RUN wget -q https://www.sqlite.org/2024/sqlite-amalgamation-3460000.zip && \
     unzip -q sqlite-amalgamation-3460000.zip && \
@@ -20,9 +21,7 @@ RUN wget -q https://www.sqlite.org/2024/sqlite-amalgamation-3460000.zip && \
     cp sqlite-amalgamation-3460000/sqlite3.h . && \
     rm -rf sqlite-amalgamation-3460000*
 
-RUN wget -q https://www.sqlite.org/src/raw/ext/icu/icu.c
-
-COPY build-ubuntu.sh /build/
-RUN chmod +x /build/build-ubuntu.sh
-
-ENTRYPOINT ["/build/build-ubuntu.sh"]
+COPY icu.c /output/
+COPY build-ubuntu.sh /output/
+RUN chmod +x /output/build-ubuntu.sh
+RUN /output/build-ubuntu.sh

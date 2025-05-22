@@ -33,11 +33,11 @@ fi
 gcc -arch ${ARCH} -fPIC -shared icu.c \
     $(pkg-config --libs --cflags icu-io) \
     -I. \
-    -o libSqliteIcu-macos-${ARCH}.dylib
+    -o icu.dylib
 
 # Verify the build
 echo "Build completed successfully!"
-file libSqliteIcu-macos-${ARCH}.dylib
-ls -la libSqliteIcu-macos-${ARCH}.dylib
+file icu.dylib
+ls -la icu.dylib
 
 echo "macOS build for ${ARCH} completed successfully!"
