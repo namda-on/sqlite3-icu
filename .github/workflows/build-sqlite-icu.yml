@@ -44,7 +44,7 @@ jobs:
       with:
         name: sqlite-icu-alpine-${{ matrix.arch }}
         path: libSqliteIcu-alpine-${{ matrix.arch }}.tar.gz
-
+        compression-level: 0
   build-ubuntu:
     name: Build Ubuntu Linux (${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
@@ -79,37 +79,43 @@ jobs:
       with:
         name: sqlite-icu-ubuntu-${{ matrix.arch }}
         path: libSqliteIcu-ubuntu24.04-${{ matrix.arch }}.tar.gz
+        compression-level: 0
 
-#   build-macos:
-#     name: Build macOS (${{ matrix.arch }})
-#     runs-on: macos-latest
-#     strategy:
-#       matrix:
-#         arch: [arm64]
+  build-macos:
+    name: Build macOS (${{ matrix.arch }})
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64]
 
-#     steps:
-#     - name: Checkout code
-#       uses: actions/checkout@v4
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-#     - name: Install dependencies
-#       run: |
-#         brew update
-#         brew install icu4c pkg-config sqlite wget
+    - name: Install dependencies
+      run: |
+        brew update
+        brew install icu4c pkg-config sqlite wget
 
-#     - name: Build extension
-#       run: |
-#         chmod +x ./build-macos.sh
-#         ARCH=${{ matrix.arch }} ./build-macos.sh
+    - name: Build extension
+      run: |
+        chmod +x ./build-macos.sh
+        ARCH=${{ matrix.arch }} ./build-macos.sh
 
-#     - name: Upload artifacts
-#       uses: actions/upload-artifact@v4
-#       with:
-#         name: sqlite-icu-macos-${{ matrix.arch }}
-#         path: libSqliteIcu-macos-${{ matrix.arch }}.dylib
+        ls
+
+        tar -czvf libSqliteIcu-darwin-${{ matrix.arc }}.tar.gz libSqliteIcu.dylib
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sqlite-icu-macos-${{ matrix.arch }}
+        path: ibSqliteIcu-darwin-${{ matrix.arc }}.tar.gz
+        compression-level: 0
 
   create-release:
     name: Create Release
-    needs: [build-alpine, build-ubuntu]
+    needs: [build-alpine, build-ubuntu, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
 
@@ -162,7 +168,7 @@ jobs:
           - **Ubuntu/Debian**: Requires `libicu` package
           - **macOS**: ICU is included in the system
 
-        draft: false
+        draft: true
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
